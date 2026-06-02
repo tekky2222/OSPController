@@ -53,6 +53,23 @@ esphome logs osp_mppt_dps.yaml
 
 Integração Home Assistant: as entidades aparecem automaticamente via API nativa do ESPHome.
 
+## Energia (Wh) — diário, mensal e total
+
+O firmware integra **potência de saída** (V × A) ao longo do tempo e expõe três contadores em **Wh**:
+
+| Entidade | Descrição |
+|----------|-----------|
+| **Solar Energy Total** | Energia cumulativa desde o último reset manual |
+| **Solar Energy Today** | Reinicia à **meia-noite** (fuso em `timezone`) |
+| **Solar Energy This Month** | Reinicia no **dia 1** de cada mês |
+
+- Valores **persistem** na flash (sobrevivem a reinícios).
+- Só acumula com **saída DPS ligada** e potência > 0.
+- Ajuste o fuso em `osp_mppt_dps.yaml` → `timezone: "America/Sao_Paulo"`.
+- Botão **Reset Energy Total** zera só o contador total (hoje/mês seguem o relógio).
+
+No Home Assistant pode usar cartões de estatística (`statistics_graph_card`) ou converter para kWh (÷ 1000) nas automações.
+
 ## Diferenças em relação ao OSPController Arduino
 
 | Recurso | OSPController | Este ESPHome |

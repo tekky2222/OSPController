@@ -281,12 +281,58 @@ inline void dps_poll() {
   id(dps_out_en).update();
 }
 
+// Energia cumulativa Wh (P * dt), como PowerSupply::doTotals no OSPController
+inline void publish_energy_sensors() {
+  id(mppt_energy_total).publish_state(id(mppt_wh_total));
+  id(mppt_energy_today).publish_state(id(mppt_wh_today));
+  id(mppt_energy_month).publish_state(id(mppt_wh_month));
+}
+
+inline void accumulate_energy(float power_w) {
+  uint32_t now = millis();
+  uint32_t last = id(mppt_energy_last_ms);
+  if (last == 0) {
+    id(mppt_energy_last_ms) = now;
+    return;
+  }
+  uint32_t dt = now - last;
+  id(mppt_energy_last_ms) = now;
+  if (dt < 50)
+    return;
+  if (dt > 120000)
+    return;  // evita pico após longa pausa sem amostras
+
+  if (!id(dps_out_en).state || power_w < 0.01f)
+    return;
+
+  float wh_delta = power_w * (dt / 1000.0f) / 3600.0f;
+  id(mppt_wh_total) = id(mppt_wh_total) + wh_delta;
+  id(mppt_wh_today) = id(mppt_wh_today) + wh_delta;
+  id(mppt_wh_month) = id(mppt_wh_month) + wh_delta;
+  publish_energy_sensors();
+}
+
+inline void reset_daily_energy() {
+  id(mppt_wh_today) = 0.0f;
+  id(mppt_energy_today).publish_state(0.0f);
+  ESP_LOGI("energy", "contador diario reiniciado (meia-noite)");
+}
+
+inline void reset_monthly_energy() {
+  id(mppt_wh_month) = 0.0f;
+  id(mppt_energy_month).publish_state(0.0f);
+  ESP_LOGI("energy", "contador mensal reiniciado (dia 1)");
+}
+
 inline void tick_measure() {
   dps_poll();
   float lv, lc, ov, oc, inv;
   bool out_en;
-  if (read_dps_values(lv, lc, ov, oc, inv, out_en))
-    id(mppt_power).publish_state(ov * oc);
+  if (read_dps_values(lv, lc, ov, oc, inv, out_en)) {
+    float p = ov * oc;
+    id(mppt_power).publish_state(p);
+    accumulate_energy(p);
+  }
   update_state();
   id(mppt_last_desired) = measure_desired_current();
 }

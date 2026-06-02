@@ -19,6 +19,8 @@ substitutions:
   mppt_meas_ms: "500"
   mppt_adjust_ms: "2000"
   mppt_autosweep_s: "600"
+  # Fuso para reinício diário (meia-noite) e mensal (dia 1)
+  timezone: "America/Sao_Paulo"
 
 esphome:
   name: ${device_name}
@@ -46,6 +48,7 @@ esphome:
             id(dps_current_scale) = 100.0f;
             ESP_LOGI("mppt", "DPS5020: escala corrente x100");
           }
+      - lambda: 'osp_mppt::publish_energy_sensors();'
 
 esp32:
   board: nodemcu-32s
@@ -160,9 +163,43 @@ sensor:
     id: mppt_power
     name: "Output Power"
     unit_of_measurement: W
+    device_class: power
     accuracy_decimals: 1
     update_interval: never
     lambda: 'return id(dps_out_volt).state * id(dps_out_curr).state;'
+
+  - platform: template
+    id: mppt_energy_total
+    name: "Solar Energy Total"
+    unit_of_measurement: Wh
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 2
+    icon: mdi:solar-power
+    update_interval: never
+    lambda: 'return id(mppt_wh_total);'
+
+  - platform: template
+    id: mppt_energy_today
+    name: "Solar Energy Today"
+    unit_of_measurement: Wh
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 2
+    icon: mdi:calendar-today
+    update_interval: never
+    lambda: 'return id(mppt_wh_today);'
+
+  - platform: template
+    id: mppt_energy_month
+    name: "Solar Energy This Month"
+    unit_of_measurement: Wh
+    device_class: energy
+    state_class: total_increasing
+    accuracy_decimals: 2
+    icon: mdi:calendar-month
+    update_interval: never
+    lambda: 'return id(mppt_wh_month);'
 
 binary_sensor:
   - platform: modbus_controller
@@ -323,6 +360,21 @@ globals:
   - id: mppt_last_desired
     type: float
     initial_value: "0"
+  - id: mppt_wh_total
+    type: float
+    restore_value: true
+    initial_value: "0"
+  - id: mppt_wh_today
+    type: float
+    restore_value: true
+    initial_value: "0"
+  - id: mppt_wh_month
+    type: float
+    restore_value: true
+    initial_value: "0"
+  - id: mppt_energy_last_ms
+    type: uint32_t
+    initial_value: "0"
 
 text_sensor:
   - platform: template
@@ -355,6 +407,33 @@ button:
     on_press:
       - lambda: 'osp_mppt::restore_from_collapse(id(mppt_curr_filt) * 0.95f);'
 
+  - platform: template
+    name: "Reset Energy Total"
+    icon: mdi:counter
+    entity_category: config
+    on_press:
+      - lambda: |-
+          id(mppt_wh_total) = 0;
+          osp_mppt::publish_energy_sensors();
+          ESP_LOGI("energy", "total reiniciado manualmente");
+
+time:
+  - platform: sntp
+    id: mppt_time
+    timezone: ${timezone}
+    on_time:
+      - seconds: 0
+        minutes: 0
+        hours: 0
+        then:
+          - lambda: 'osp_mppt::reset_daily_energy();'
+      - seconds: 0
+        minutes: 0
+        hours: 0
+        days_of_month: 1
+        then:
+          - lambda: 'osp_mppt::reset_monthly_energy();'
+
 interval:
   # Medição + MPPT proporcional + sweep (measperiod; x2 durante sweep)
   - interval: ${mppt_meas_ms}ms
@@ -385,6 +464,7 @@ interval:
   - interval: 10s
     then:
       - lambda: |-
-          ESP_LOGI("mppt", "Vin=%.1f set=%.1f Ilim=%.2f st=%d en=%d",
+          ESP_LOGI("mppt", "Vin=%.1f set=%.1f Ilim=%.2f st=%d | Wh hoje=%.1f mes=%.1f total=%.1f",
             id(mppt_in_volt), id(mppt_setpoint).state,
-            id(dps_limit_curr).state, id(mppt_state), (int) id(mppt_enable).state);
+            id(dps_limit_curr).state, id(mppt_state),
+            id(mppt_wh_today), id(mppt_wh_month), id(mppt_wh_total);
