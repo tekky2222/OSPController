@@ -1,6 +1,8 @@
 #! /usr/bin/env python
 import os, sys, subprocess
 
+SKETCH_VERSION_CPP = os.path.join("OSPController", "version.cpp")
+
 def shellCmd(cmd):
   return subprocess.check_output(cmd.split(' ')).strip().decode("utf-8")
 
@@ -13,6 +15,17 @@ def getVersion():
     return getDescribe().replace("-dirty", ".d") + "-" + str(getGitDate())
   except Exception as e:
     return os.path.basename(os.getcwd())
+
+def writeVersionCpp(version):
+  content = (
+    '#include "version.h"\n\n'
+    'const char* GIT_VERSION = "' + version.replace('\\', '\\\\').replace('"', '\\"') + '";\n'
+  )
+  os.makedirs(os.path.dirname(SKETCH_VERSION_CPP), exist_ok=True)
+  with open(SKETCH_VERSION_CPP, 'w', encoding='utf-8') as ofile:
+    ofile.write(content)
+  return SKETCH_VERSION_CPP
+
 def prettyPrint():
   try: #optional colorful output
     from colorama import Fore, Back, Style
@@ -30,16 +43,11 @@ elif arg == "simple":
 
 else:
   prettyPrint()
+  version = getVersion()
+  path = writeVersionCpp(version)
+  print(" - version written to " + path)
 
-  try: #if running inside platformio
+  try:  # if running inside platformio (sketch already compiles version.cpp)
     Import("env")
-    # print(env.Dump()) # <- can use this to see what's available
-    bpath = os.path.join(env.subst("$BUILD_DIR"), "generated")
-    print(" - version injection to " + bpath)
-
-    if not os.path.exists(bpath): os.makedirs(bpath)
-    with open(os.path.join(bpath, "version.cpp"), 'w+') as ofile:
-      ofile.write("const char* GIT_VERSION(\"" + getVersion() + "\");" + os.linesep)
-    env.BuildSources(os.path.join(bpath, "build"), bpath)
   except NameError:
     pass

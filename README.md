@@ -40,6 +40,12 @@ _DC -> DC -> DC_ Solar. With a single used solar panel, a few used batteries, an
 - [Part 4:Data](https://github.com/opensolarproject/OSPController/wiki/Step-4-Data-Visualization)
 - [Part 5:Wiring](https://github.com/opensolarproject/OSPController/wiki/Step-5-Wiring-Things)
 
+## Firmware
+
+- **ESPHome (DPS only):** [`esphome/osp_mppt_dps.yaml`](esphome/osp_mppt_dps.yaml) — MPPT nativo para Home Assistant; ver [esphome/README.md](esphome/README.md).
+- **Arduino IDE:** open [`OSPController/OSPController.ino`](OSPController/OSPController.ino) and follow [ARDUINO_IDE.md](ARDUINO_IDE.md) (ESP32 board package, PubSubClient, ModbusMaster, EspSoftwareSerial).
+- **PlatformIO:** `pio run` / `pio run -t upload` (same sketch and `OSPController/libraries/MPPTLib`).
+
 ## Also join the [Discord Channel](https://discord.gg/GtR3JShfGu)
 It's the discussion board to talk shop, get ideas, get help, triage issues, and share success! [discord.gg/MRQvKR](https://discord.gg/GtR3JShfGu)
 
